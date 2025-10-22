@@ -266,3 +266,20 @@ canvas{
 @media (prefers-reduced-motion: reduce){
   * { transition: none !important; animation: none !important; }
 }
+
+/* --- Gráficas API externa --- */
+#ext-tasks-charts .charts-grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+#ext-tasks-charts h3{
+  margin: .25rem 0 .5rem;
+  font-weight: 600;
+}
+@media (max-width: 900px){
+  #ext-tasks-charts .charts-grid{ grid-template-columns: 1fr; }
+}
+
+#ext-tasks-charts .charts-grid > div { height: 260px; }
+#ext-tasks-charts canvas { width: 100% !important; height: 100% !important; display: block; }

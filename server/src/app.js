@@ -10,6 +10,8 @@ import { authRequired, roleRequired } from "./middlewares/auth.js";
 import sessionRoutes from "./routes/sessionRoutes.js";
 import metricasRoutes from "./routes/metricas.js";
 import empleadosRoutes from './routes/empleados.js';
+import externalTasksRoutes from "./routes/externalTasks.js";
+
 
 dotenv.config();
 const app = express();
@@ -27,6 +29,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/session", sessionRoutes);
 app.use("/api/metricas", metricasRoutes);
 app.use('/api/empleados', empleadosRoutes);
+app.use("/api/external", externalTasksRoutes);
 
 // Healthcheck y prueba de BD
 app.get("/api/health", async (req, res) => {
