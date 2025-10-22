@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <title>Dashboard · Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="../css/styles.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- JS de filtros y KPIs (ya lo hicimos en pasos previos) -->
+  <script src="../js/dashboard-filtros.js" defer></script>
+</head>
+<body>
+<header class="container">
+  <h1>Dashboard (Admin)</h1>
+  <div>
+    <span id="userBadge">—</span>
+    <a href="../index.html" id="logoutLink" style="margin-left:1rem;">Salir</a>
+  </div>
+</header>
+
+<main class="container">
+  <!-- BARRA ÚNICA DE FILTROS -->
+  <section class="card" id="filtros">
+    <div class="grid">
+      <label>Fuente
+        <select id="f_source">
+          <option value="ventas" selected>ventas (actual)</option>
+          <option value="venta">venta (legacy)</option>
+        </select>
+      </label>
+      <label>Desde
+        <input id="f_desde" type="date">
+      </label>
+      <label>Hasta
+        <input id="f_hasta" type="date">
+      </label>
+      <label>Empleado
+        <select id="f_empleado">
+          <option value="">— Todos —</option>
+        </select>
+      </label>
+      <button id="f_aplicar">Aplicar</button>
+    </div>
+    <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.5rem;">
+  <button id="btnExpLineaCSV">Línea CSV</button>
+  <button id="btnExpLineaXLSX">Línea Excel</button>
+  <button id="btnExpTopCSV">Top CSV</button>
+  <button id="btnExpTopXLSX">Top Excel</button>
+</div>
+  </section>
+
+  <!-- KPIs con IDs que usa dashboard-filtros.js -->
+  <section class="kpis">
+    <div class="kpi">
+      <h3>Ventas</h3>
+      <p id="kpi-num-ventas">0</p>
+    </div>
+    <div class="kpi">
+      <h3>Monto</h3>
+      <p id="kpi-monto-total">0</p>
+    </div>
+    <div class="kpi">
+      <h3>Ticket prom.</h3>
+      <p id="kpi-ticket-prom">0</p>
+    </div>
+  </section>
+
+  <!-- Gráfica de ventas por día -->
+  <section class="card">
+    <h2>Ventas por día</h2>
+    <div style="height:300px">
+      <canvas id="chart-ventas-dia"></canvas>
+    </div>
+  </section>
+
+  <!-- Top 5 Productos -->
+  <section class="card">
+  <h2>Top 5 productos</h2>
+  <div style="height:300px">
+    <canvas id="chart-top-productos"></canvas>
+  </div>
+</section>
+
+</main>
+
+<script>
+  // --- BARRAS: TOP PRODUCTOS ---
+  let topChart;
+  function drawBar(canvasId, labels, data) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (topChart) topChart.destroy();
+    topChart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Cantidad', data }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  }
+
+  async function loadTopFromFilters() {
+    const source = document.getElementById('f_source')?.value || 'ventas';
+    const desde  = document.getElementById('f_desde')?.value;
+    const hasta  = document.getElementById('f_hasta')?.value;
+    const empleado_id = document.getElementById('f_empleado')?.value;
+
+    const url = new URL(`${API_BASE}/metricas/top-productos`);
+    if (source) url.searchParams.set('source', source);
+    if (desde)  url.searchParams.set('desde',  desde);
+    if (hasta)  url.searchParams.set('hasta',  hasta);
+    if (empleado_id) url.searchParams.set('empleado_id', empleado_id);
+
+    try {
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json(); // { items: [{producto,cantidad}, ...] }
+      const labels = (data.items || []).map(i => i.producto);
+      const values = (data.items || []).map(i => Number(i.cantidad || 0));
+      drawBar('chart-top-productos', labels, values);
+    } catch(e) { console.error(e); }
+  }
+
+  // Integramos con el botón "Aplicar"
+  document.getElementById('f_aplicar').addEventListener('click', () => {
+    loadSerieFromFilters();
+    loadTopFromFilters();
+  });
+
+  // En la primera carga (después de que dashboard-filtros.js ponga fechas/empleados):
+  setTimeout(() => {
+    loadSerieFromFilters();
+    loadTopFromFilters();
+  }, 200);
+</script>
+
+
+<script>
+  // Info de sesión + saludo
+  const API_BASE = location.origin + '/api';
+  async function me() {
+    const r = await fetch(`${API_BASE}/session/me`, { credentials: 'include' });
+    if (!r.ok) { location.href = '../index.html'; return null; }
+    const u = await r.json();
+    const role = (u.rol || u.role || '').toUpperCase();
+    if (role !== 'ADMIN') { location.href = '../index.html'; return null; }
+    document.getElementById('userBadge').textContent = `Hola, ${u.nombre || u.correo || 'Admin'}`;
+    return u;
+  }
+
+  // Render línea (Chart.js)
+  let ventasChart;
+  function drawLine(canvasId, labels, data) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (ventasChart) ventasChart.destroy();
+    ventasChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [{ label: 'Ventas', data }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  }
+
+  function buildParams() {
+  const source = document.getElementById('f_source')?.value || 'ventas';
+  const desde = document.getElementById('f_desde')?.value;
+  const hasta = document.getElementById('f_hasta')?.value;
+  const empleado_id = document.getElementById('f_empleado')?.value;
+  const p = new URLSearchParams();
+  if (source) p.set('source', source);
+  if (desde) p.set('desde', desde);
+  if (hasta) p.set('hasta', hasta);
+  if (empleado_id) p.set('empleado_id', empleado_id);
+  return p.toString();
+}
+
+async function downloadWithCreds(url, filename) {
+  const r = await fetch(url, { credentials:'include' });
+  if (!r.ok) return alert('No se pudo descargar');
+  const blob = await r.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+document.getElementById('btnExpLineaCSV')?.addEventListener('click', () => {
+  const qs = buildParams();
+  downloadWithCreds(`${API_BASE}/metricas/ventas-por-dia.csv?${qs}`, 'ventas_por_dia.csv');
+});
+document.getElementById('btnExpLineaXLSX')?.addEventListener('click', () => {
+  const qs = buildParams();
+  downloadWithCreds(`${API_BASE}/metricas/ventas-por-dia.xlsx?${qs}`, 'ventas_por_dia.xlsx');
+});
+document.getElementById('btnExpTopCSV')?.addEventListener('click', () => {
+  const qs = buildParams();
+  downloadWithCreds(`${API_BASE}/metricas/top-productos.csv?${qs}`, 'top_productos.csv');
+});
+document.getElementById('btnExpTopXLSX')?.addEventListener('click', () => {
+  const qs = buildParams();
+  downloadWithCreds(`${API_BASE}/metricas/top-productos.xlsx?${qs}`, 'top_productos.xlsx');
+});
+
+
+  // Cargar serie usando los mismos filtros
+  async function loadSerieFromFilters() {
+    const source = document.getElementById('f_source')?.value || 'ventas';
+    const desde  = document.getElementById('f_desde')?.value;
+    const hasta  = document.getElementById('f_hasta')?.value;
+    const empleado_id = document.getElementById('f_empleado')?.value;
+
+    const url = new URL(`${API_BASE}/metricas/ventas-por-dia`);
+    if (source) url.searchParams.set('source', source);   // si el backend aún no lo usa, lo ignora
+    if (desde)  url.searchParams.set('desde',  desde);
+    if (hasta)  url.searchParams.set('hasta',  hasta);
+    if (empleado_id) url.searchParams.set('empleado_id', empleado_id);
+
+    try {
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json(); // espera { series: { labels, data } } o array {dia,total}
+      if (data?.series) {
+        drawLine('chart-ventas-dia', data.series.labels, data.series.data);
+      } else if (Array.isArray(data)) {
+        drawLine('chart-ventas-dia', data.map(r => r.dia), data.map(r => Number(r.total||0)));
+      }
+    } catch(e) { console.error(e); }
+  }
+
+  // Logout (limpia front)
+  document.getElementById('logoutLink').addEventListener('click', () => {
+    localStorage.removeItem('usuario');
+  });
+
+  // Sin duplicar lógica: cuando se hace clic en "Aplicar" (dashboard-filtros.js ya actualiza KPIs),
+  // aquí además refrescamos la gráfica con los mismos filtros.
+  document.getElementById('f_aplicar').addEventListener('click', loadSerieFromFilters);
+
+  
+  
+  (async () => {
+    const u = await me(); if (!u) return;
+    // Primera carga de la gráfica (dashboard-filtros.js ya setea fechas y KPIs onload)
+    // damos un pequeño margen para que dashboard-filtros.js inicialice fechas/empleados
+    setTimeout(loadSerieFromFilters, 150);
+  })();
+</script>
+</body>
+</html>

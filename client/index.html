@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login · Empresa Dashboards</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <!-- Contenedor para centrar vertical/horizontal -->
+  <div class="login-wrapper">
+    <!-- Card corporativa (suma estilos: tu .card + .login-card) -->
+    <div class="login-card card">
+      <h2 style="margin-bottom:.25rem">Inicio de sesión</h2>
+      <p class="m-0" style="color:var(--text-2); margin-bottom:1rem">
+        Accede a tu panel corporativo
+      </p>
+
+      <form id="loginForm" autocomplete="on">
+        <input id="correo" type="email" placeholder="Correo" autocomplete="username" required />
+        <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" required />
+        <button id="btnLogin" type="submit">Ingresar</button>
+      </form>
+
+      <!-- Mensajes (usa tus clases existentes) -->
+      <div id="msg" class="msg" style="margin-top:.75rem"></div>
+
+      <!-- Pie discreto -->
+      <footer style="margin-top:1.2rem; font-size:.9rem; color:var(--muted)">
+        © <span id="year"></span> Empresa S.A.
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    // Usar siempre el mismo origen que sirve el frontend
+    localStorage.removeItem('API_BASE');
+    const API_BASE = location.origin + '/api';
+
+    const $ = (id) => document.getElementById(id);
+    const form = $('loginForm');
+    const btn  = $('btnLogin');
+    const msg  = $('msg');
+
+    function setMsg(text, isError=false){ msg.textContent = text||''; msg.className = 'msg'+(isError?' error':''); }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      setMsg(''); btn.disabled = true;
+
+      const correo = $('correo').value.trim().toLowerCase();
+      const password = $('password').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ correo, password }) 
+        });
+
+        // Mensajes claros según status
+        if (res.status === 400) { setMsg('Faltan credenciales.', true); btn.disabled=false; return; }
+        if (res.status === 401) { setMsg('Usuario o contraseña incorrectos.', true); btn.disabled=false; return; }
+        if (!res.ok) { setMsg('Error en el servidor.', true); btn.disabled=false; return; }
+
+        const data = await res.json();
+        if (!data?.token) { setMsg('Respuesta inválida del servidor.', true); btn.disabled=false; return; }
+
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('API_BASE', API_BASE);
+        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+
+        const role = String(data.user?.rol || data.user?.role || '').toUpperCase();
+        if (role === 'ADMIN') location.href = './admin/dashboard.html';
+        else if (role === 'EMPLEADO') location.href = './empleado/dashboard.html';
+        else { setMsg('Rol no reconocido.', true); btn.disabled = false; }
+      } catch (err) {
+        console.error(err);
+        setMsg('Error de conexión con el servidor.', true);
+        btn.disabled = false;
+      }
+    });
+
+    // Año dinámico del footer (no afecta lógica)
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

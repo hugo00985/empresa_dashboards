@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <title>Dashboard · Empleado</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="../css/styles.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<header class="container">
+  <h1>Mi Dashboard (Empleado)</h1>
+  <div>
+    <span id="userBadge">—</span>
+    <a href="../index.html" id="logoutLink" style="margin-left:1rem;">Salir</a>
+  </div>
+</header>
+
+<main class="container">
+  <!-- Filtros (sin selector de empleado) -->
+  <section class="card" id="filtros">
+    <div class="grid">
+      <label>Fuente
+        <select id="f_source">
+          <option value="ventas" selected>ventas (actual)</option>
+          <option value="venta">venta (legacy)</option>
+        </select>
+      </label>
+      <label>Desde
+        <input id="f_desde" type="date">
+      </label>
+      <label>Hasta
+        <input id="f_hasta" type="date">
+      </label>
+      <button id="f_aplicar">Aplicar</button>
+    </div>
+    <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.5rem;">
+      <button id="btnExpLineaCSV">Línea CSV</button>
+      <button id="btnExpLineaXLSX">Línea Excel</button>
+      <button id="btnExpTopCSV">Top CSV</button>
+      <button id="btnExpTopXLSX">Top Excel</button>
+    </div>
+  </section>
+
+  <!-- KPIs (mismos IDs que usa Admin para reutilizar estilos) -->
+  <section class="kpis">
+    <div class="kpi">
+      <h3>Mis ventas</h3>
+      <p id="kpi-num-ventas">0</p>
+    </div>
+    <div class="kpi">
+      <h3>Mi monto</h3>
+      <p id="kpi-monto-total">0</p>
+    </div>
+    <div class="kpi">
+      <h3>Ticket prom.</h3>
+      <p id="kpi-ticket-prom">0</p>
+    </div>
+  </section>
+
+  <!-- Gráfica de ventas por día -->
+  <section class="card">
+    <h2>Mis ventas por día</h2>
+    <div style="height:300px">
+      <canvas id="chart-ventas-dia"></canvas>
+    </div>
+  </section>
+
+  <!-- Top 5 Productos -->
+  <section class="card">
+    <h2>Mis Top 5 productos</h2>
+    <div style="height:300px">
+      <canvas id="chart-top-productos"></canvas>
+    </div>
+  </section>
+</main>
+
+<script>
+  const API_BASE = location.origin + '/api';
+
+  // Utilidades
+  function todayISO(d = new Date()) { return d.toISOString().slice(0,10); }
+  function setText(id, v){ const el=document.getElementById(id); if(el) el.textContent=v; }
+  function initDefaultDates(){
+    const d = new Date(); const start = new Date(d.getFullYear(), d.getMonth(), 1);
+    const desde = document.getElementById('f_desde');
+    const hasta = document.getElementById('f_hasta');
+    if (desde && !desde.value) desde.value = todayISO(start);
+    if (hasta && !hasta.value) hasta.value = todayISO(d);
+  }
+  async function api(path){
+    const r = await fetch(path, { credentials:'include' });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }
+
+  // Sesión y rol
+  async function me() {
+    const u = await api('/api/session/me');
+    document.getElementById('userBadge').textContent = `Hola, ${u.nombre || u.correo || 'Empleado'}`;
+    const role = (u.rol || u.role || '').toUpperCase();
+    if (role !== 'EMPLEADO') {
+      // Si no es empleado, evitar acceso
+      location.href = '../index.html';
+      return null;
+    }
+    return u;
+  }
+
+  // Obtener id_empleado ligado al usuario
+  async function meEmpleado() {
+    return api('/api/empleados/me'); // { id_empleado, nombre, ... }
+  }
+
+  // Charts
+  let ventasChart, topChart;
+  function drawLine(canvasId, labels, data) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (ventasChart) ventasChart.destroy();
+    // eslint-disable-next-line no-undef
+    ventasChart = new Chart(ctx, {
+      type:'line',
+      data:{ labels, datasets:[{ label:'Mis ventas', data }] },
+      options:{ responsive:true, maintainAspectRatio:false }
+    });
+  }
+  function drawBar(canvasId, labels, data) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (topChart) topChart.destroy();
+    // eslint-disable-next-line no-undef
+    topChart = new Chart(ctx, {
+      type:'bar',
+      data:{ labels, datasets:[{ label:'Cantidad', data }] },
+      options:{ responsive:true, maintainAspectRatio:false }
+    });
+  }
+
+  // Build params siempre con el id del empleado
+  function buildParams(empleadoId) {
+    const source = document.getElementById('f_source')?.value || 'ventas';
+    const desde  = document.getElementById('f_desde')?.value;
+    const hasta  = document.getElementById('f_hasta')?.value;
+    const p = new URLSearchParams();
+    if (source) p.set('source', source);
+    if (desde)  p.set('desde', desde);
+    if (hasta)  p.set('hasta', hasta);
+    if (empleadoId) p.set('empleado_id', empleadoId);
+    return p.toString();
+  }
+
+  async function aplicar(empleadoId){
+    const qs = buildParams(empleadoId);
+
+    // KPIs personales
+    const resumen = await api(`/api/metricas/resumen?${qs}`);
+    setText('kpi-num-ventas', resumen.kpis.numVentas);
+    setText('kpi-monto-total', Number(resumen.kpis.montoTotal).toFixed(2));
+    setText('kpi-ticket-prom', Number(resumen.kpis.ticketPromedio).toFixed(2));
+
+    // Serie
+    const serie = await api(`/api/metricas/ventas-por-dia?${qs}`);
+    if (serie?.series) drawLine('chart-ventas-dia', serie.series.labels, serie.series.data);
+
+    // Top
+    const top = await api(`/api/metricas/top-productos?${qs}`);
+    const labels = (top.items || []).map(i => i.producto);
+    const data   = (top.items || []).map(i => Number(i.cantidad||0));
+    drawBar('chart-top-productos', labels, data);
+  }
+
+  // Exportaciones (CSV/XLSX) respetando filtros + empleado
+  async function downloadWithCreds(url, filename) {
+    const r = await fetch(url, { credentials:'include' });
+    if (!r.ok) return alert('No se pudo descargar');
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  document.getElementById('logoutLink')?.addEventListener('click', () => {
+    localStorage.removeItem('usuario');
+  });
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    initDefaultDates();
+    const u = await me(); if (!u) return;
+    const emp = await meEmpleado(); // { id_empleado }
+
+    document.getElementById('f_aplicar').addEventListener('click', () => aplicar(emp.id_empleado));
+
+    // Botones de export
+    document.getElementById('btnExpLineaCSV')?.addEventListener('click', () => {
+      downloadWithCreds(`${API_BASE}/metricas/ventas-por-dia.csv?${buildParams(emp.id_empleado)}`, 'mis_ventas_por_dia.csv');
+    });
+    document.getElementById('btnExpLineaXLSX')?.addEventListener('click', () => {
+      downloadWithCreds(`${API_BASE}/metricas/ventas-por-dia.xlsx?${buildParams(emp.id_empleado)}`, 'mis_ventas_por_dia.xlsx');
+    });
+    document.getElementById('btnExpTopCSV')?.addEventListener('click', () => {
+      downloadWithCreds(`${API_BASE}/metricas/top-productos.csv?${buildParams(emp.id_empleado)}`, 'mi_top_productos.csv');
+    });
+    document.getElementById('btnExpTopXLSX')?.addEventListener('click', () => {
+      downloadWithCreds(`${API_BASE}/metricas/top-productos.xlsx?${buildParams(emp.id_empleado)}`, 'mi_top_productos.xlsx');
+    });
+
+    // Primera carga
+    aplicar(emp.id_empleado);
+  });
+</script>
+</body>
+</html>
