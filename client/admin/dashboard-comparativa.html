@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <title>Dashboard · Ventas vs Stock</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="../css/styles.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script defer src="../js/dashboard-comparativa.js"></script>
+</head>
+<body>
+<header class="container">
+  <h1>Ventas vs Stock</h1>
+  <nav><a href="./dashboard-admin.html">← Volver</a></nav>
+</header>
+
+<main class="container">
+  <section class="row" style="gap:8px;align-items:center">
+    <label>Año: <input id="cmpAnio" type="number" min="2000" max="2100" style="width:120px"/></label>
+    <button id="btnCmpReload">Actualizar</button>
+  </section>
+
+  <section class="cards">
+    <div class="card">
+      <h3>Ventas mensuales vs Stock valorizado</h3>
+      <canvas id="cmpChart" height="120"></canvas>
+    </div>
+    <div class="card">
+      <h3>Detalle</h3>
+      <table class="table" id="cmpTable">
+        <thead><tr><th>Mes</th><th>Ventas</th><th>Stock valorizado (ref.)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+</body>
+</html>

@@ -11,7 +11,9 @@ import sessionRoutes from "./routes/sessionRoutes.js";
 import metricasRoutes from "./routes/metricas.js";
 import empleadosRoutes from './routes/empleados.js';
 import externalTasksRoutes from "./routes/externalTasks.js";
-
+import externalDiag from "./routes/externalDiag.js";
+import inventoryRoutes from "./routes/inventoryRoutes.js";
+import comparativaRoutes from "./routes/comparativaRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -30,6 +32,9 @@ app.use("/api/session", sessionRoutes);
 app.use("/api/metricas", metricasRoutes);
 app.use('/api/empleados', empleadosRoutes);
 app.use("/api/external", externalTasksRoutes);
+app.use("/api/external", externalDiag);
+app.use("/api/inventario", inventoryRoutes);
+app.use("/api/comparativa", comparativaRoutes);
 
 // Healthcheck y prueba de BD
 app.get("/api/health", async (req, res) => {

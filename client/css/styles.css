@@ -283,3 +283,96 @@ canvas{
 
 #ext-tasks-charts .charts-grid > div { height: 260px; }
 #ext-tasks-charts canvas { width: 100% !important; height: 100% !important; display: block; }
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  color: #f1f1f1;
+}
+
+.table th,
+.table td {
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+}
+
+.table thead th {
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.table tbody tr {
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.2s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.table td:nth-child(1) {
+  font-weight: 500;
+  color: #ffd166;
+}
+
+.table td:last-child {
+  text-align: right;
+}
+
+/* Alinear números a la derecha (opcional) */
+.table td:nth-child(2),
+.table td:nth-child(3),
+.table td:nth-child(4),
+.table td:nth-child(5) {
+  text-align: right;
+}
+
+/* === Secciones del Dashboard === */
+.card {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin-top: 1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.card h3 {
+  color: #90cdf4;
+  font-size: 1.05rem;
+  margin-bottom: 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 0.4rem;
+}
+
+.kpis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.kpi {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  text-align: center;
+  padding: 1rem;
+}
+
+.kpi h3 {
+  font-size: 1rem;
+  color: #a0aec0;
+  margin-bottom: 0.4rem;
+}
+
+.kpi p {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #63b3ed;
+}

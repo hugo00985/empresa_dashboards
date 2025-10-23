@@ -80,6 +80,50 @@ async function aplicar(empleadoId){
   drawBar('chart-mi-top', labels, data);
 }
 
+/* ========= AÑADIDOS: KPI DE DESEMPEÑO ========= */
+
+// 1) Carga KPI de desempeño personal (no modifica nada existente)
+async function loadMiDesempeno(empleadoId){
+  const source = document.getElementById('f_source')?.value || 'ventas';
+  const desde  = document.getElementById('f_desde')?.value;
+  const hasta  = document.getElementById('f_hasta')?.value;
+
+  const p = new URLSearchParams({ source, desde, hasta, empleado_id: empleadoId });
+  try {
+    const d = await api(`/api/metricas/desempeno?${p.toString()}`);
+
+    const label  = document.getElementById('kpi-mi-desempeno');
+    const detail = document.getElementById('kpi-mi-desempeno-detalle');
+    if (!label || !detail) return; // por si el HTML aún no lo tiene
+
+    // Texto principal
+    label.textContent = d.clasificacion || (d.comparacion === 'sin_datos' ? 'Sin datos' : '—');
+    // Detalle
+    if (d.comparacion === 'vs_pares') {
+      detail.textContent = `Mi monto: ${d.montoEvaluado} · Prom. pares: ${d.promedioPares} · Ratio: ${d.ratio}x`;
+    } else if (d.comparacion === 'sin_datos') {
+      detail.textContent = 'No hay ventas en el rango seleccionado';
+    } else {
+      detail.textContent = `Prom. general: ${d.promedioTodos}`;
+    }
+
+    // Color según clasificación
+    label.style.color = (d.clasificacion === 'Alto') ? 'green'
+                     : (d.clasificacion === 'Bajo') ? 'crimson'
+                     : 'inherit';
+  } catch (e) {
+    console.error('loadMiDesempeno', e);
+  }
+}
+
+// 2) Envoltorio para no tocar la función aplicar(): llamamos aplicar() y luego el KPI
+async function aplicarConDesempeno(empleadoId){
+  await aplicar(empleadoId);
+  await loadMiDesempeno(empleadoId);
+}
+
+/* ========= FIN AÑADIDOS ========= */
+
 document.getElementById('logoutLink')?.addEventListener('click', () => {
   localStorage.removeItem('usuario');
 });
@@ -94,6 +138,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // location.href = '../index.html';
   }
   const emp = await meEmpleado();
-  document.getElementById('f_aplicar').addEventListener('click', () => aplicar(emp.id_empleado));
-  aplicar(emp.id_empleado); // primera carga
+
+  // ⬇️ Cambiamos SOLO las llamadas para incluir desempeño, sin borrar aplicar()
+  document.getElementById('f_aplicar').addEventListener('click', () => aplicarConDesempeno(emp.id_empleado));
+  aplicarConDesempeno(emp.id_empleado); // primera carga
 });
